@@ -76,8 +76,9 @@ class MainActivity : AppCompatActivity() {
             pm.getInstalledPackages(PackageManager.GET_PERMISSIONS)
         }
 
-        val userApps = packages.filter {
-            it.applicationInfo != null && (it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0)
+        val userApps = packages.filter { pkgInfo ->
+            val appInfo = pkgInfo.applicationInfo
+            appInfo != null && (appInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0)
         }
         sb.appendLine("Пользовательских приложений: ${userApps.size}")
 
@@ -148,11 +149,11 @@ class MainActivity : AppCompatActivity() {
 
         for (p in userApps) {
             val uid = p.applicationInfo?.uid ?: continue
-            if (isOpAllowed(appOps, "android:system_alert_window", uid, p.packageName)) {
+            if (isOpAllowed(appOps, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, p.packageName)) {
                 overlay.add(p.packageName)
             }
             if (Build.VERSION.SDK_INT >= 26 &&
-                isOpAllowed(appOps, "android:request_install_packages", uid, p.packageName)
+                isOpAllowed(appOps, AppOpsManager.OPSTR_REQUEST_INSTALL_PACKAGES, uid, p.packageName)
             ) {
                 installUnknown.add(p.packageName)
             }
@@ -199,8 +200,12 @@ class MainActivity : AppCompatActivity() {
         uid: Int,
         pkg: String
     ): Boolean {
-        @Suppress("DEPRECATION")
-        val mode = appOps.checkOpNoThrow(op, uid, pkg)
+        val mode = if (Build.VERSION.SDK_INT >= 29) {
+            appOps.unsafeCheckOpNoThrow(op, uid, pkg)
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.checkOpNoThrow(op, uid, pkg)
+        }
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
