@@ -149,11 +149,11 @@ class MainActivity : AppCompatActivity() {
 
         for (p in userApps) {
             val uid = p.applicationInfo?.uid ?: continue
-            if (isOpAllowed(appOps, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, p.packageName)) {
+            if (isOpAllowed(appOps, "android:system_alert_window", uid, p.packageName)) {
                 overlay.add(p.packageName)
             }
             if (Build.VERSION.SDK_INT >= 26 &&
-                isOpAllowed(appOps, AppOpsManager.OPSTR_REQUEST_INSTALL_PACKAGES, uid, p.packageName)
+                isOpAllowed(appOps, "android:request_install_packages", uid, p.packageName)
             ) {
                 installUnknown.add(p.packageName)
             }
@@ -200,13 +200,23 @@ class MainActivity : AppCompatActivity() {
         uid: Int,
         pkg: String
     ): Boolean {
-        val mode = if (Build.VERSION.SDK_INT >= 29) {
-            appOps.unsafeCheckOpNoThrow(op, uid, pkg)
-        } else {
+        return try {
             @Suppress("DEPRECATION")
-            appOps.checkOpNoThrow(op, uid, pkg)
+            val mode = if (Build.VERSION.SDK_INT >= 29) {
+                appOps.unsafeCheckOpNoThrow(op, uid, pkg)
+            } else {
+                if (op == "android:system_alert_window") {
+                    appOps.checkOpNoThrow(AppOpsManager.OP_SYSTEM_ALERT_WINDOW, uid, pkg)
+                } else if (Build.VERSION.SDK_INT >= 26 && op == "android:request_install_packages") {
+                    appOps.checkOpNoThrow(AppOpsManager.OP_REQUEST_INSTALL_PACKAGES, uid, pkg)
+                } else {
+                    return false
+                }
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            false
         }
-        return mode == AppOpsManager.MODE_ALLOWED
     }
 
     private fun dirSize(dir: File): Long =
