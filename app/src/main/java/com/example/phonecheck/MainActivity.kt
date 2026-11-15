@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val userApps = packages.filter {
-            it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0
+            it.applicationInfo != null && (it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0)
         }
         sb.appendLine("Пользовательских приложений: ${userApps.size}")
 
@@ -106,7 +106,7 @@ class MainActivity : AppCompatActivity() {
                 ?: emptyList()
 
             if (granted.isNotEmpty()) {
-                val label = p.applicationInfo.loadLabel(pm)
+                val label = p.applicationInfo?.loadLabel(pm) ?: p.packageName
                 risky.add(
                     "$label (${p.packageName}): " +
                         granted.joinToString { it.substringAfterLast('.') }
@@ -147,12 +147,12 @@ class MainActivity : AppCompatActivity() {
         val installUnknown = mutableListOf<String>()
 
         for (p in userApps) {
-            val uid = p.applicationInfo.uid
-            if (isOpAllowed(appOps, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, p.packageName)) {
+            val uid = p.applicationInfo?.uid ?: continue
+            if (isOpAllowed(appOps, "android:system_alert_window", uid, p.packageName)) {
                 overlay.add(p.packageName)
             }
             if (Build.VERSION.SDK_INT >= 26 &&
-                isOpAllowed(appOps, AppOpsManager.OPSTR_REQUEST_INSTALL_PACKAGES, uid, p.packageName)
+                isOpAllowed(appOps, "android:request_install_packages", uid, p.packageName)
             ) {
                 installUnknown.add(p.packageName)
             }
@@ -199,12 +199,8 @@ class MainActivity : AppCompatActivity() {
         uid: Int,
         pkg: String
     ): Boolean {
-        val mode = if (Build.VERSION.SDK_INT >= 29) {
-            appOps.unsafeCheckOpNoThrow(op, uid, pkg)
-        } else {
-            @Suppress("DEPRECATION")
-            appOps.checkOpNoThrow(op, uid, pkg)
-        }
+        @Suppress("DEPRECATION")
+        val mode = appOps.checkOpNoThrow(op, uid, pkg)
         return mode == AppOpsManager.MODE_ALLOWED
     }
 
